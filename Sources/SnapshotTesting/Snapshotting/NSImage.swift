@@ -4,26 +4,30 @@ import XCTest
 
 extension Diffing where Value == NSImage {
   /// A pixel-diffing strategy for NSImage's which requires a 100% match.
-  public static let image: Diffing = Diffing.image(precision: 1, subpixelThreshold: 0)
+  public static let image = Diffing.image()
 
   /// A pixel-diffing strategy for NSImage that allows customizing how precise the matching must be.
   ///
-  /// - Parameter precision: A value between 0 and 1, where 1 means the images must match 100% of their pixels.
-  /// - Parameter subpixelThreshold: The byte-value threshold at which two subpixels are considered different.
+  /// - Parameters:
+  ///   - precision: The percentage of pixels that must match.
+  ///   - perceptualPrecision: The percentage a pixel must match the source pixel to be considered a match. [98-99% mimics the precision of the human eye.](http://zschuessler.github.io/DeltaE/learn/#toc-defining-delta-e)
   /// - Returns: A new diffing strategy.
-  public static func image(precision: Float, subpixelThreshold: UInt8) -> Diffing {
+  public static func image(precision: Float = 1, perceptualPrecision: Float = 0.98) -> Diffing {
     return .init(
       toData: { NSImagePNGRepresentation($0)! },
       fromData: { NSImage(data: $0)! }
     ) { old, new in
-      guard !compare(old, new, precision: precision, subpixelThreshold: subpixelThreshold) else { return nil }
+      guard let message = compare(old, new, precision: precision, perceptualPrecision: perceptualPrecision) else { return nil }
       let difference = SnapshotTesting.diff(old, new)
-      let message = new.size == old.size
-        ? "Newly-taken snapshot does not match reference."
-        : "Newly-taken snapshot@\(new.size) does not match reference@\(old.size)."
+      let oldAttachment = XCTAttachment(image: old)
+      oldAttachment.name = "reference"
+      let newAttachment = XCTAttachment(image: new)
+      newAttachment.name = "failure"
+      let differenceAttachment = XCTAttachment(image: difference)
+      differenceAttachment.name = "difference"
       return (
         message,
-        [XCTAttachment(image: old), XCTAttachment(image: new), XCTAttachment(image: difference)]
+        [oldAttachment, newAttachment, differenceAttachment]
       )
     }
   }
@@ -32,17 +36,18 @@ extension Diffing where Value == NSImage {
 extension Snapshotting where Value == NSImage, Format == NSImage {
   /// A snapshot strategy for comparing images based on pixel equality.
   public static var image: Snapshotting {
-    return .image(precision: 1, subpixelThreshold: 0)
+    return .image()
   }
 
   /// A snapshot strategy for comparing images based on pixel equality.
   ///
-  /// - Parameter precision: The percentage of pixels that must match.
-  /// - Parameter subpixelThreshold: The byte-value threshold at which two subpixels are considered different.
-  public static func image(precision: Float, subpixelThreshold: UInt8) -> Snapshotting {
+  /// - Parameters:
+  ///   - precision: The percentage of pixels that must match.
+  ///   - perceptualPrecision: The percentage a pixel must match the source pixel to be considered a match. [98-99% mimics the precision of the human eye.](http://zschuessler.github.io/DeltaE/learn/#toc-defining-delta-e)
+  public static func image(precision: Float = 1, perceptualPrecision: Float = 0.98) -> Snapshotting {
     return .init(
       pathExtension: "png",
-      diffing: .image(precision: precision, subpixelThreshold: subpixelThreshold)
+      diffing: .image(precision: precision, perceptualPrecision: perceptualPrecision)
     )
   }
 }
@@ -54,46 +59,62 @@ private func NSImagePNGRepresentation(_ image: NSImage) -> Data? {
   return rep.representation(using: .png, properties: [:])
 }
 
-private func compare(_ old: NSImage, _ new: NSImage, precision: Float, subpixelThreshold: UInt8) -> Bool {
-  guard let oldCgImage = old.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
-  guard let newCgImage = new.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
-  guard oldCgImage.width != 0 else { return false }
-  guard newCgImage.width != 0 else { return false }
-  guard oldCgImage.width == newCgImage.width else { return false }
-  guard oldCgImage.height != 0 else { return false }
-  guard newCgImage.height != 0 else { return false }
-  guard oldCgImage.height == newCgImage.height else { return false }
-  guard let oldContext = context(for: oldCgImage) else { return false }
-  guard let newContext = context(for: newCgImage) else { return false }
-  guard let oldData = oldContext.data else { return false }
-  guard let newData = newContext.data else { return false }
+private func compare(_ old: NSImage, _ new: NSImage, precision: Float, perceptualPrecision: Float) -> String? {
+  guard let oldCgImage = old.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+    return "Reference image could not be loaded."
+  }
+  guard let newCgImage = new.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+    return "Newly-taken snapshot could not be loaded."
+  }
+  guard newCgImage.width != 0, newCgImage.height != 0 else {
+    return "Newly-taken snapshot is empty."
+  }
+  guard oldCgImage.width == newCgImage.width, oldCgImage.height == newCgImage.height else {
+    return "Newly-taken snapshot@\(new.size) does not match reference@\(old.size)."
+  }
+  guard let oldContext = context(for: oldCgImage), let oldData = oldContext.data else {
+    return "Reference image's data could not be loaded."
+  }
+  guard let newContext = context(for: newCgImage), let newData = newContext.data else {
+    return "Newly-taken snapshot's data could not be loaded."
+  }
   let byteCount = oldContext.height * oldContext.bytesPerRow
-  if memcmp(oldData, newData, byteCount) == 0 { return true }
-  let newer = NSImage(data: NSImagePNGRepresentation(new)!)!
-  guard let newerCgImage = newer.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
-  guard let newerContext = context(for: newerCgImage) else { return false }
-  guard let newerData = newerContext.data else { return false }
-  if memcmp(oldData, newerData, byteCount) == 0 { return true }
-  if precision >= 1 { return false }
-  let oldRep = NSBitmapImageRep(cgImage: oldCgImage)
-  let newRep = NSBitmapImageRep(cgImage: newerCgImage)
-  var differentPixelCount = 0
-  let pixelCount = oldRep.pixelsWide * oldRep.pixelsHigh
-  let threshold = Int((1 - precision) * Float(pixelCount))
-  let p1: UnsafeMutablePointer<UInt8> = oldRep.bitmapData!
-  let p2: UnsafeMutablePointer<UInt8> = newRep.bitmapData!
-
-  var offset = 0
-  while offset < pixelCount * 4 {
-    if p1[offset].diff(between: p2[offset]) > subpixelThreshold {
-      differentPixelCount += 1
-      if differentPixelCount > threshold {
-        return false
+  if memcmp(oldData, newData, byteCount) == 0 { return nil }
+  guard
+    let pngData = NSImagePNGRepresentation(new),
+    let newerCgImage = NSImage(data: pngData)?.cgImage(forProposedRect: nil, context: nil, hints: nil),
+    let newerContext = context(for: newerCgImage),
+    let newerData = newerContext.data
+  else {
+    return "Newly-taken snapshot's data could not be loaded."
+  }
+  if memcmp(oldData, newerData, byteCount) == 0 { return nil }
+  if precision >= 1, perceptualPrecision >= 1 {
+    return "Newly-taken snapshot does not match reference."
+  }
+  if perceptualPrecision < 1, #available(macOS 10.13, *) {
+    return perceptuallyCompare(
+      CIImage(cgImage: oldCgImage),
+      CIImage(cgImage: newCgImage),
+      pixelPrecision: precision,
+      perceptualPrecision: perceptualPrecision
+    )
+  } else {
+    let oldRep = NSBitmapImageRep(cgImage: oldCgImage).bitmapData!
+    let newRep = NSBitmapImageRep(cgImage: newerCgImage).bitmapData!
+    let byteCountThreshold = Int((1 - precision) * Float(byteCount))
+    var differentByteCount = 0
+    for offset in 0..<byteCount {
+      if oldRep[offset] != newRep[offset] {
+        differentByteCount += 1
       }
     }
-    offset += 1
+    if differentByteCount > byteCountThreshold {
+      let actualPrecision = 1 - Float(differentByteCount) / Float(byteCount)
+      return "Actual image precision \(actualPrecision) is less than required \(precision)"
+    }
   }
-  return true
+  return nil
 }
 
 private func context(for cgImage: CGImage) -> CGContext? {
