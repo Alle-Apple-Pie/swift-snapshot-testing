@@ -35,7 +35,6 @@ extension Snapshotting where Value: SwiftUI.View, Format == UIImage {
     drawHierarchyInKeyWindow: Bool = false,
     precision: Float = 1,
     perceptualPrecision: Float = 0.98,
-    subpixelThreshold: UInt8 = 0,
     layout: SwiftUISnapshotLayout = .sizeThatFits,
     traits: UITraitCollection = .init()
     )

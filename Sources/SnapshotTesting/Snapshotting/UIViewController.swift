@@ -19,7 +19,6 @@ extension Snapshotting where Value == UIViewController, Format == UIImage {
     on config: ViewImageConfig,
     precision: Float = 1,
     perceptualPrecision: Float = 0.98,
-    subpixelThreshold: UInt8 = 0,
     size: CGSize? = nil,
     traits: UITraitCollection = .init()
     )
@@ -48,7 +47,6 @@ extension Snapshotting where Value == UIViewController, Format == UIImage {
     drawHierarchyInKeyWindow: Bool = false,
     precision: Float = 1,
     perceptualPrecision: Float = 0.98,
-    subpixelThreshold: UInt8 = 0,
     size: CGSize? = nil,
     traits: UITraitCollection = .init()
     )

@@ -13,9 +13,7 @@ extension Diffing where Value == UIImage {
   ///   - perceptualPrecision: The percentage a pixel must match the source pixel to be considered a match. [98-99% mimics the precision of the human eye.](http://zschuessler.github.io/DeltaE/learn/#toc-defining-delta-e)
   ///   - scale: Scale to use when loading the reference image from disk. If `nil` or the `UITraitCollection`s default value of `0.0`, the screens scale is used.
   /// - Returns: A new diffing strategy.
-  public static func image(precision: Float = 1, perceptualPrecision: Float = 0.98,
-                           subpixelThreshold: UInt8 = 0,
-                           scale: CGFloat? = nil) -> Diffing {
+  public static func image(precision: Float = 1, perceptualPrecision: Float = 0.98, scale: CGFloat? = nil) -> Diffing {
     let imageScale: CGFloat
     if let scale = scale, scale != 0.0 {
       imageScale = scale
@@ -68,7 +66,6 @@ extension Snapshotting where Value == UIImage, Format == UIImage {
   ///   - perceptualPrecision: The percentage a pixel must match the source pixel to be considered a match. [98-99% mimics the precision of the human eye.](http://zschuessler.github.io/DeltaE/learn/#toc-defining-delta-e)
   ///   - scale: The scale of the reference image stored on disk.
   public static func image(precision: Float = 1, perceptualPrecision: Float = 0.98,
-                           subpixelThreshold: UInt8 = 0,
                            scale: CGFloat? = nil) -> Snapshotting {
     return .init(
       pathExtension: "png",
