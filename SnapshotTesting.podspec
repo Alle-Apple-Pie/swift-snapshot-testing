@@ -1,5 +1,5 @@
 Pod::Spec.new do |s|
-  s.name = "SnapshotTesting"
+  s.name = "SnapshotTesting-MBox"
   s.version = "1.16.1"
   s.summary = "Tests that save and assert against reference data"
 
