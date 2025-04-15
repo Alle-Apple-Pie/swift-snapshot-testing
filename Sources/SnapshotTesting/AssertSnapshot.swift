@@ -537,6 +537,15 @@ func sanitizePathComponent(_ string: String) -> String {
   }
 #endif
 
+/* Our flacky tests run test repeatedly, in XCUITests we fix this counter by watching XCTestObservationCenter,
+ * which naturally does not work in Swift Testing.
+ * I could not find good callback for this in Swift 5. Swift 6 adds TestScoping Trait https://github.com/swiftlang/swift-evolution/blob/main/proposals/testing/0007-test-scoping-traits.md
+ * It sounds like it would be good place for callback, right now you have to run this function manually in Suite init.
+ */
+public func resetCounterForReapeatedlyTesting() {
+  counter.reset()
+}
+
 // We need to clean counter between tests executions in order to support test-iterations.
 private class CleanCounterBetweenTestCases: NSObject, XCTestObservation {
   private static var registered = false
