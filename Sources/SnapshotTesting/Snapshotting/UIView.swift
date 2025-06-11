@@ -25,7 +25,7 @@
     public static func image(
       drawHierarchyInKeyWindow: Bool = false,
       precision: Float = 1,
-      perceptualPrecision: Float = 1,
+      perceptualPrecision: Float = 0.99,
       size: CGSize? = nil,
       traits: UITraitCollection = .init(),
       delay: Double? = nil

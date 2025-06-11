@@ -40,7 +40,7 @@
       public static func image(
         drawHierarchyInKeyWindow: Bool = false,
         precision: Float = 1,
-        perceptualPrecision: Float = 1,
+        perceptualPrecision: Float = 0.99,
         layout: SwiftUISnapshotLayout = .sizeThatFits,
         traits: UITraitCollection = .init(),
         delay: Double? = nil
