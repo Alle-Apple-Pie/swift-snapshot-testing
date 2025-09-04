@@ -277,7 +277,7 @@ public func verifySnapshot<Value, Format>(
   as snapshotting: Snapshotting<Value, Format>,
   named name: String? = nil,
   record recording: Bool? = nil,
-  snapshotDirectory: String? = nil,
+  snapshotDirectory snapshotDir: String? = nil,
   timeout: TimeInterval = 5,
   fileID: StaticString = #fileID,
   file filePath: StaticString = #file,
@@ -310,6 +310,12 @@ public func verifySnapshot<Value, Format>(
         let snapshotsBaseUrl = fileUrl.deletingLastPathComponent()
       #endif
 
+      var snapshotDirectory: String?
+      if #available(iOS 16.0, *) {
+        snapshotDirectory = bazelSnapshotDirectory(for: filePath) ?? snapshotDir
+      } else {
+        snapshotDirectory = snapshotDir
+      }
       let snapshotDirectoryUrl =
         snapshotDirectory.map { URL(fileURLWithPath: $0, isDirectory: true) }
         ?? snapshotsBaseUrl.appendingPathComponent("__Snapshots__").appendingPathComponent(fileName)
@@ -580,4 +586,15 @@ enum File {
       counts.removeAll()
     }
   }
+}
+
+@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+func bazelSnapshotDirectory(for filePath: StaticString) -> String? {
+    guard let IS_BAZEL = ProcessInfo.processInfo.environment["IS_BAZEL"], IS_BAZEL == "1" else { return nil }
+    return ProcessInfo.processInfo.environment["TEST_SRCDIR"].map { ref_dir in
+        let fileUrl = URL(fileURLWithPath: "\(filePath)", isDirectory: false)
+        let fileName = fileUrl.deletingPathExtension().lastPathComponent
+        let snapshotsBaseUrl = fileUrl.deletingLastPathComponent()
+        return ref_dir + "/" + (ProcessInfo.processInfo.environment["TEST_WORKSPACE"] ?? "__main") + "/" + snapshotsBaseUrl.path() + "__Snapshots__/" + fileName
+    }
 }
